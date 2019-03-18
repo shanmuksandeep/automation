@@ -1,0 +1,32 @@
+resources:
+- name: pipeline-script
+  type: git
+  source:
+   uri: ssh://git@bitbucket.glb.syfbank.com:7999/ppcf/concourse-scripts.git
+   private_key: {{git_private_key}}
+- name: automation
+  type: git
+  source:
+    branch: master
+    uri: ssh://git@bitbucket.glb.syfbank.com:7999/ppcf/automation.git
+    private_key: {{git_private_key}}
+jobs:
+- name: auto-create-pipeline
+  serial: true
+  plan:
+  - get: automation
+    trigger: false
+  - get: pipeline-script
+    trigger: false
+  - task: run-pipeline
+    file: automation/tiles-upgrade/task-run-tile-upgrade.yml
+    params:
+      OPS_MANAGER_HOSTNAME: {{ops-manager-hostname}}
+      UAA_CLIENT_ID: {{uaa-client-id}}
+      UAA_CLIENT_SECRET: {{uaa-client-secret}}
+      CONCOURSE_HOSTNAME: {{csz_cc_hostname}}
+      CONCOURSE_TEAMSID: {{csz_cc_team_id}}
+      CONCOURSE_USERID: {{csz_cc_team_userid}}
+      CONCOURSE_PASS: {{csz_cc_team_pass}}
+      UNPAUSE_FLAG: {{unPauseFlag}}
+      FOUNDATION: {{foundation}}

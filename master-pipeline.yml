@@ -1,0 +1,101 @@
+resources:
+- name: pipeline-script
+  type: git
+  source:
+   uri: ssh://git@bitbucket.glb.syfbank.com:7999/ppcf/concourse-scripts.git
+   private_key: {{git_private_key}}
+- name: cfmgmtpipeline-script
+  type: git
+  source:
+   uri: ssh://git@bitbucket.glb.syfbank.com:7999/ppcf/cf-mgmt.git
+   private_key: {{git_private_key}}
+- name: cfmgmt-asg-pipeline-script
+  type: git
+  source:
+   uri: ssh://git@bitbucket.glb.syfbank.com:7999/ppcf/cf-mgmt-asg.git
+   private_key: {{git_private_key}}
+- name: clamav-scripts
+  type: git
+  source:
+   uri: ssh://git@bitbucket.glb.syfbank.com:7999/ppcf/clamav-db-update.git
+   private_key: {{git_private_key}}
+- name: bbr-pipeline-tasks-repo
+  type: git
+  source:
+    uri: ssh://git@bitbucket.glb.syfbank.com:7999/ppcf/bbr-backup.git
+    private_key: {{git_private_key}}
+- name: automation-repo
+  type: git
+  source:
+    uri: ssh://git@bitbucket.glb.syfbank.com:7999/ppcf/automation.git
+    private_key: {{git_private_key}}
+jobs:
+- name: create-pipeline
+  plan:
+  - get: pipeline-script
+    # trigger: true
+  - get: cfmgmtpipeline-script
+    trigger: true
+  - get: cfmgmt-asg-pipeline-script
+    trigger: true
+  - get: clamav-scripts
+    trigger: true
+  - get: bbr-pipeline-tasks-repo
+    trigger: true
+  - get: automation-repo
+  - task: pipeline
+    config:
+      platform: linux
+      inputs:
+      - name: pipeline-script
+      - name: cfmgmtpipeline-script
+      - name: cfmgmt-asg-pipeline-script
+      - name: clamav-scripts
+      - name: bbr-pipeline-tasks-repo
+      - name: automation-repo
+      image_resource:
+        type: docker-image
+        source: {repository: cloudfoundry/cflinuxfs2}
+      run:
+        path: sh
+        args:
+        - -exc
+        - |
+          find .
+          wget -O fly http://vpnccourseda01.prvcld.syfbank.com/api/v1/cli?arch=amd64\&platform=linux
+          chmod +x ./fly
+          ./fly --version
+          for foundation in $(ls ./pipeline-script/ci/foundations/* | grep -v TST | grep -v SCAN); do
+              foundation_fullname=$(basename "$foundation")
+              foundation_name="${foundation_fullname%.*}"
+              cc_user=$(grep "concourse_userid" $foundation | cut -d ":" -f 2 | tr -d " ")
+              cc_pass=$(grep "concourse_pass" $foundation | cut -d ":" -f 2 | tr -d " ")
+              ./fly -t $foundation_name login -c http://vpnccourseda01.prvcld.syfbank.com -u $cc_user -p $cc_pass -n $foundation_name
+              ./fly -t $foundation_name pipelines
+              # Pipeline for Major Ops-Manager Upgrade using v0.17.1-rc.2 pcf-pipelines
+              ./fly -t $foundation_name set-pipeline -p "$foundation_name-Upgrade-OpsMan-Major-NEW" -c ./automation-repo/opsman-upgrade/vsphere-v0.17.1-rc.2/pipeline.yml -l ./pipeline-script/ci/credentials/credentials.yml -l "$foundation" -n
+              # Pipeline for Apply Changes using v0.23 pcf-pipelines
+              ./fly -t $foundation_name set-pipeline -p "$foundation_name-Apply-Changes-NEW" -c ./automation-repo/apply-changes-pipeline.yml -l ./pipeline-script/ci/credentials/credentials.yml -l "$foundation" -n
+              # Pipeline for ClamAV
+              ./fly -t $foundation_name set-pipeline -p "$foundation_name-ClamAV-Update" -c ./clamav-scripts/ci/pipelines/ClamAV-Update-Virus-DB.yml -l ./pipeline-script/ci/credentials/credentials.yml -l "$foundation" -n
+              # Pipeline for CF-Manage ASG
+              ./fly -t $foundation_name set-pipeline -p "$foundation_name-CF-MGMT-ASGRules" -c ./cfmgmt-asg-pipeline-script/pipeline.yml -l "$foundation" -l ./pipeline-script/ci/credentials/credentials.yml -n
+              # Pipeline for CF-Manage
+              ./fly -t $foundation_name set-pipeline -p "$foundation_name-CF-MGMT-New" -c ./cfmgmtpipeline-script/pipeline.yml -l "$foundation" -l ./pipeline-script/ci/credentials/credentials.yml -n
+              # Pipelines for Tile Deployments in each Foundation
+              ./fly -t $foundation_name set-pipeline -p "$foundation_name-Auto-Stage-Tile-NEW" -c ./automation-repo/tiles-upgrade-main-pipeline.yml -l ./pipeline-script/ci/credentials/credentials.yml -l "$foundation" -n
+              # Pipelines for Bosh CloudCheck Run in each Foundation
+              ./fly -t $foundation_name set-pipeline -p "$foundation_name-Run-Bosh-Cloud-Check" -c ./automation-repo/pipeline-bosh-cloud-check.yml -l ./pipeline-script/ci/credentials/credentials.yml -l "$foundation" -n
+              # Pipelines for Errands Run in each Foundation
+              ./fly -t $foundation_name set-pipeline -p "$foundation_name-Run-Errands" -c ./automation-repo/pipline_run_errands.yml -l ./pipeline-script/ci/credentials/credentials.yml -l "$foundation" -n
+              # Pipeline for Buildpack Upgrade
+              #./fly -t $foundation_name set-pipeline -p "$foundation_name-Upgrade-Buildpacks" -c ./pipeline-script/ci/pipelines/buildpack-upgrade.yml -l ./pipeline-script/ci/credentials/credentials.yml -l "$foundation" -n
+              # Pipeline for Stemcell Upgrade Adhoc
+              ./fly -t $foundation_name set-pipeline -p "$foundation_name-Upgrade-Stemcell-Adhoc" -c ./pipeline-script/ci/pipelines/stemcell-upgrade.yml -l ./pipeline-script/ci/credentials/credentials.yml -l "$foundation" -n
+              # Pipeline for Foundation Testing
+              # ./fly -t $foundation_name set-pipeline -p "$foundation_name-FoundationTest" -c ./pipeline-script/ci/pipelines/foundation-test.yml -l ./pipeline-script/ci/credentials/credentials.yml -l "$foundation" -n
+              # Pipeline for BBR Backups
+              ./fly -t $foundation_name set-pipeline -p "$foundation_name-BBR-Backups" -c ./pipeline-script/ci/pipelines/bbr_backup_from_jumpbox.yml -l ./pipeline-script/ci/credentials/credentials.yml -l "$foundation" -n
+              # Pipeline for Monitoring Expiring Certifacts
+              ./fly -t $foundation_name set-pipeline -p "$foundation_name-Monitor-Expiring-Certs" -c ./pipeline-script/ci/pipelines/monitor-cert-expiry.yml -l ./pipeline-script/ci/credentials/credentials.yml -l "$foundation" -n
+          done

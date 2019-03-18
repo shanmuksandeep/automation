@@ -1,0 +1,14 @@
+# Bill of Materials in the foundation for Jan-2019
+LAB_opsman_major_minor_version: 2.2.16
+LAB_ERT_product_version: 2.2.11
+LAB_MySQL_product_version: 1.10.14
+LAB_RabbitMQ_product_version: 1.12.15
+LAB_Redis_product_version: 1.13.7
+LAB_Metrics_product_version: 1.5.0
+LAB_SSO_product_version: 1.7.2
+LAB_JMXBridge_product_version: 1.9.9
+LAB_NewRelicBroker_product_version: 1.12.20
+LAB_NewRelicNozzle_product_version: 1.0.4
+LAB_SCS_product_version: 2.0.5
+LAB_SplunkNozzle_product_version: 1.0.1
+LAB_MySQLv2_product_version: 2.4.4

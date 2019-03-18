@@ -1,0 +1,9 @@
+OPS_MANAGER_HOSTNAME:  https://opsman.sandbox.cflab01.in.hclcnlabs.com
+UAA_CLIENT_ID: {{uaa-client-id}}
+UAA_CLIENT_SECRET: {{uaa-client-secret}}
+CONCOURSE_HOSTNAME:  https://ci.cflab01.in.hclcnlabs.com
+CONCOURSE_TEAMSID: main
+CONCOURSE_USERID: admin 
+CONCOURSE_PASS: d9Un6icbkRDaRPflylz9SoqhVPMCi2
+UNPAUSE_FLAG: false
+FOUNDATION: LAB
